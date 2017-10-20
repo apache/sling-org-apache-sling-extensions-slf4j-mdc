@@ -38,10 +38,10 @@
     </description>
 
   <scm>
-    <connection>scm:svn:http://svn.apache.org/repos/asf/sling/trunk/contrib/extensions/slf4j-mdc</connection>
+    <connection>scm:git:https://gitbox.apache.org/repos/asf/sling-org-apache-sling-extensions-slf4j-mdc.git</conncetion>
     <developerConnection>scm:svn:https://svn.apache.org/repos/asf/sling/trunk/contrib/extensions/slf4j-mdc
     </developerConnection>
-    <url>http://svn.apache.org/viewvc/sling/trunk/contrib/extensions/slf4j-mdc</url>
+    <url>https://gitbox.apache.org/repos/asf?p=sling-org-apache-sling-extensions-slf4j-mdc.git.git</url>
   </scm>
 
     <properties>
