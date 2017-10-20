@@ -39,9 +39,8 @@
 
   <scm>
     <connection>scm:git:https://gitbox.apache.org/repos/asf/sling-org-apache-sling-extensions-slf4j-mdc.git</conncetion>
-    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/sling/trunk/contrib/extensions/slf4j-mdc
-    </developerConnection>
-    <url>https://gitbox.apache.org/repos/asf?p=sling-org-apache-sling-extensions-slf4j-mdc.git.git</url>
+    <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/sling-org-apache-sling-extensions-slf4j-mdc.git</developerConnection>
+    <url>https://gitbox.apache.org/repos/asf?p=sling-org-apache-sling-extensions-slf4j-mdc.git</url>
   </scm>
 
     <properties>
