@@ -70,6 +70,7 @@
       <plugin>
         <groupId>org.apache.felix</groupId>
         <artifactId>maven-scr-plugin</artifactId>
+        <version>1.26.4</version>    
       </plugin>
 
       <!-- Required for pax exam-->
