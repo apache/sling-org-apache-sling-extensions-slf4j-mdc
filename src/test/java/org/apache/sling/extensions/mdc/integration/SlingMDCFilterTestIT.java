@@ -20,84 +20,91 @@ package org.apache.sling.extensions.mdc.integration;
 
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.impl.cookie.BasicClientCookie;
-import org.apache.sling.testing.tools.http.Request;
 import org.apache.sling.testing.tools.http.RequestBuilder;
-import org.apache.sling.testing.tools.http.RequestCustomizer;
 import org.apache.sling.testing.tools.http.RequestExecutor;
 import org.apache.sling.testing.tools.retry.RetryLoop;
-import org.junit.AfterClass;
-import org.junit.Assert;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
-import org.ops4j.pax.exam.ExamSystem;
-import org.ops4j.pax.exam.TestContainer;
-import org.ops4j.pax.exam.spi.DefaultExamSystem;
-import org.ops4j.pax.exam.spi.PaxExamRuntime;
+import org.junit.runner.RunWith;
+import org.ops4j.pax.exam.Configuration;
+import org.ops4j.pax.exam.Option;
+import org.ops4j.pax.exam.junit.PaxExam;
+import org.ops4j.pax.exam.spi.reactors.ExamReactorStrategy;
+import org.ops4j.pax.exam.spi.reactors.PerClass;
+import org.osgi.framework.BundleEvent;
+import org.osgi.framework.BundleListener;
+import org.osgi.service.cm.ConfigurationAdmin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.StringReader;
-import java.util.concurrent.TimeUnit;
-
+import javax.inject.Inject;
 import javax.json.Json;
 import javax.json.JsonObject;
+import java.io.IOException;
+import java.io.StringReader;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
-import static junit.framework.Assert.assertNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.ops4j.pax.exam.CoreOptions.options;
 
-public class ITMDCFilter {
-    private static Logger log = LoggerFactory.getLogger(ITMDCFilter.class);
-    private static TestContainer testContainer;
+@RunWith(PaxExam.class)
+@ExamReactorStrategy(PerClass.class)
+public class SlingMDCFilterTestIT extends SlingMDCTestSupport {
+
+    private static Logger log = LoggerFactory.getLogger(SlingMDCFilterTestIT.class);
 
     private DefaultHttpClient httpClient = new DefaultHttpClient();
     private RequestExecutor executor = new RequestExecutor(httpClient);
+    private String localHostUrl;
 
     @Before
-    public void startContainer() throws Exception {
-        if (testContainer == null) {
-            ServerConfiguration sc = new ServerConfiguration();
-            ExamSystem system = DefaultExamSystem.create(sc.config());
-            testContainer = PaxExamRuntime.createContainer(system);
-            testContainer.start();
-            new RetryLoop(new RetryLoop.Condition() {
-                public String getDescription() {
-                    return "Check if MDCTestServlet is up";
-                }
+    public void setUp() throws IOException, InterruptedException {
+        localHostUrl = String.format("http://localhost:%s", httpPort());
 
-                public boolean isTrue() throws Exception {
-                    RequestBuilder rb = new RequestBuilder(ServerConfiguration.getServerUrl());
-                    executor.execute(rb.buildGetRequest("/mdc")).assertStatus(200);
-                    rb = new RequestBuilder(ServerConfiguration.getServerUrl());
+        new RetryLoop(new RetryLoop.Condition() {
+            public String getDescription() {
+                return "Check if MDCTestServlet is up";
+            }
 
-                    //Create test config via servlet
-                    executor.execute(rb.buildGetRequest("/mdc", "createTestConfig", "true"));
-                    TimeUnit.SECONDS.sleep(1);
-                    return true;
-                }
-            },5,100);
-        }
+            public boolean isTrue() throws Exception {
+                RequestBuilder requestBuilder = new RequestBuilder(localHostUrl);
+                executor.execute(requestBuilder.buildGetRequest("/mdc")).assertStatus(200);
+                requestBuilder = new RequestBuilder(localHostUrl);
+
+                //Create test config via servlet
+                executor.execute(requestBuilder.buildGetRequest("/mdc", "createTestConfig", "true"));
+                TimeUnit.SECONDS.sleep(1);
+                return true;
+            }
+        }, 5, 100);
+
+    }
+
+    @Configuration
+    public Option[] configuration() throws IOException {
+        return options(
+                baseConfiguration()
+        );
     }
 
     @Test
-    public void testDefault() throws Exception{
-        RequestBuilder rb = new RequestBuilder(ServerConfiguration.getServerUrl());
+    public void testDefault() throws Exception {
+        RequestBuilder rb = new RequestBuilder(localHostUrl);
         // Add Sling POST options
-        RequestExecutor result = executor.execute(
-                rb.buildGetRequest("/mdc","foo","bar"));
+        RequestExecutor result = executor.execute(rb.buildGetRequest("/mdc", "foo", "bar"));
+        JsonObject jsonObject = Json.createReader(new StringReader(result.getContent())).readObject();
 
-        JsonObject jb = Json.createReader(new StringReader(result.getContent())).readObject();
-        assertEquals("/mdc", jb.getString("req.requestURI"));
-        assertEquals("foo=bar", jb.getString("req.queryString"));
-        assertEquals(ServerConfiguration.getServerUrl() + "/mdc", jb.getString("req.requestURL"));
-        log.info("Response  {}",result.getContent());
+        assertEquals("/mdc", jsonObject.getString("req.requestURI"));
+        assertEquals("foo=bar", jsonObject.getString("req.queryString"));
+        assertEquals(localHostUrl + "/mdc", jsonObject.getString("req.requestURL"));
+        log.info("Response  {}", result.getContent());
     }
 
     @Test
-    public void testWihCustomData() throws Exception{
-        RequestBuilder rb = new RequestBuilder(ServerConfiguration.getServerUrl());
+    public void testWihCustomData() throws Exception {
+        RequestBuilder rb = new RequestBuilder(localHostUrl);
 
         //Create test config via servlet
         executor.execute(rb.buildGetRequest("/mdc", "createTestConfig", "true"));
@@ -117,10 +124,10 @@ public class ITMDCFilter {
         );
 
         JsonObject jb = Json.createReader(new StringReader(result.getContent())).readObject();
-        log.info("Response  {}",result.getContent());
+        log.info("Response  {}", result.getContent());
 
         assertEquals("/mdc", jb.getString("req.requestURI"));
-        assertEquals(ServerConfiguration.getServerUrl() + "/mdc", jb.getString("req.requestURL"));
+        assertEquals(localHostUrl + "/mdc", jb.getString("req.requestURL"));
         assertEquals("foo-forwarded-for", jb.getString("req.xForwardedFor"));
         assertEquals("foo-test-header", jb.getString("mdc-test-header"));
         assertEquals("foo-test-param", jb.getString("mdc-test-param"));
@@ -128,14 +135,5 @@ public class ITMDCFilter {
 
         //Only configured params must be returned
         assertFalse(jb.containsKey("ignored-param"));
-    }
-
-
-    @AfterClass
-    public static void stopContainer() {
-        if (testContainer != null) {
-            testContainer.stop();
-            testContainer = null;
-        }
     }
 }

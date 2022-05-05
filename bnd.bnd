@@ -1,0 +1,8 @@
+-includeresource:\
+    @org.apache.sling.commons.osgi-*.jar!/org/apache/sling/commons/osgi/PropertiesUtil.class
+
+-noimportjava: true
+
+-removeheaders:\
+  Include-Resource,\
+  Private-Package
