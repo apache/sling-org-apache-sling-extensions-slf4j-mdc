@@ -197,14 +197,14 @@ public class MDCInsertingFilter implements Filter {
         parameterNames.clear();
         parameterNames.addAll(params);
 
-        List<String> keyNames = new ArrayList<>();
-        keyNames.addAll(headerNames);
-        keyNames.addAll(cookieNames);
-        keyNames.addAll(parameterNames);
-        keyNames.addAll(Arrays.asList(DEFAULT_KEY_NAMES));
+        List<String> keyList = new ArrayList<>();
+        keyList.addAll(headerNames);
+        keyList.addAll(cookieNames);
+        keyList.addAll(parameterNames);
+        keyList.addAll(Arrays.asList(DEFAULT_KEY_NAMES));
 
         this.keyNames.clear();
-        this.keyNames.addAll(keyNames);
+        this.keyNames.addAll(keyList);
     }
 
     @Deactivate
