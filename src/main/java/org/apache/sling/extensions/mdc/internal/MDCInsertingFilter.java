@@ -18,18 +18,18 @@
  */
 package org.apache.sling.extensions.mdc.internal;
 
-import org.apache.felix.scr.annotations.Activate;
-import org.apache.felix.scr.annotations.Component;
-import org.apache.felix.scr.annotations.ConfigurationPolicy;
-import org.apache.felix.scr.annotations.Deactivate;
-import org.apache.felix.scr.annotations.Modified;
-import org.apache.felix.scr.annotations.Property;
-import org.apache.felix.scr.annotations.Service;
-import org.apache.sling.commons.osgi.PropertiesUtil;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceFactory;
 import org.osgi.framework.ServiceRegistration;
+import org.osgi.service.component.annotations.Activate;
+import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.ConfigurationPolicy;
+import org.osgi.service.component.annotations.Deactivate;
+import org.osgi.service.component.annotations.Modified;
+import org.osgi.service.metatype.annotations.AttributeDefinition;
+import org.osgi.service.metatype.annotations.Designate;
+import org.osgi.service.metatype.annotations.ObjectClassDefinition;
 import org.slf4j.MDC;
 
 import javax.servlet.Filter;
@@ -43,23 +43,22 @@ import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Dictionary;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.List;
-import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
-@Service
-@Component(metatype = true,
-        label="%mdc.label",
-        description = "%mdc.description",
-        policy = ConfigurationPolicy.REQUIRE
-)
-@Property(name = "pattern",value = "/.*", propertyPrivate = true)
 /**
  * Filter is based on ch.qos.logback.classic.helpers.MDCInsertingServletFilter
  */
+@Component(immediate = true,
+        configurationPolicy = ConfigurationPolicy.REQUIRE,
+        property = {
+            "pattern=/.*"
+        })
+@Designate(ocd = MDCInsertingFilter.Config.class)
 public class MDCInsertingFilter implements Filter {
     public static final String REQUEST_REMOTE_HOST_MDC_KEY = "req.remoteHost";
     public static final String REQUEST_USER_AGENT_MDC_KEY = "req.userAgent";
@@ -77,27 +76,28 @@ public class MDCInsertingFilter implements Filter {
             REQUEST_X_FORWARDED_FOR
     };
 
-    private static final String[] EMPTY_VALUE = new String[0];
+    private Set<String> keyNames = new CopyOnWriteArraySet<>();
 
-    @Property
-    private static final String PROP_HEADERS = "headers";
+    private Set<String> headerNames = new CopyOnWriteArraySet<>();
 
-    @Property
-    private static final String PROP_PARAMS = "parameters";
+    private Set<String> parameterNames = new CopyOnWriteArraySet<>();
 
-    @Property
-    private static final String PROP_COOKIES = "cookies";
-
-
-    private Set<String> keyNames = new CopyOnWriteArraySet<String>();
-
-    private Set<String> headerNames = new CopyOnWriteArraySet<String>();
-
-    private Set<String> parameterNames = new CopyOnWriteArraySet<String>();
-
-    private Set<String> cookieNames = new CopyOnWriteArraySet<String>();
+    private Set<String> cookieNames = new CopyOnWriteArraySet<>();
 
     private ServiceRegistration filterReg;
+
+    @ObjectClassDefinition(name = "%mdc.label", description = "%mdc.description")
+    public @interface Config {
+
+        @AttributeDefinition
+        String[] headers() default {};
+
+        @AttributeDefinition
+        String[] parameters() default {};
+
+        @AttributeDefinition
+        String[] cookies() default {};
+    }
 
 
     public void init(FilterConfig filterConfig) throws ServletException {
@@ -160,10 +160,10 @@ public class MDCInsertingFilter implements Filter {
     }
 
     @Activate
-    private void activate(BundleContext context,Map<String, Object> config) {
-        Properties p = new Properties();
-        p.setProperty("filter.scope","REQUEST");
-        //The MDC Filter might be running in a non Sling container. Hence to avoid
+    private void activate(BundleContext context, Config config) {
+        final Dictionary<String, Object> properties = new Hashtable<>();
+        properties.put("filter.scope", "REQUEST");
+        //The MDC Filter might be running in a non Sling container. Hence, to avoid
         //direct dependency on Sling we use a ServiceFactory
         filterReg = context.registerService(Filter.class.getName(),new ServiceFactory() {
             private Object instance;
@@ -178,33 +178,33 @@ public class MDCInsertingFilter implements Filter {
             public void ungetService(Bundle bundle, ServiceRegistration serviceRegistration, Object o) {
 
             }
-        },p);
+        }, properties);
 
         modified(config);
     }
 
     @Modified
-    private void modified(Map<String,Object> config){
-        Set<String> headers = toTrimmedValues(config, PROP_HEADERS);
+    private void modified(Config config){
+        Set<String> headers = new HashSet<>(Arrays.asList(config.headers()));
         headerNames.clear();
         headerNames.addAll(headers);
 
-        Set<String> cookies = toTrimmedValues(config,PROP_COOKIES);
+        Set<String> cookies = new HashSet<>(Arrays.asList(config.cookies()));
         cookieNames.clear();
         cookieNames.addAll(cookies);
 
-        Set<String> params = toTrimmedValues(config,PROP_PARAMS);
+        Set<String> params = new HashSet<>(Arrays.asList(config.parameters()));
         parameterNames.clear();
         parameterNames.addAll(params);
 
-        List<String> keyNames = new ArrayList<String>();
-        keyNames.addAll(headerNames);
-        keyNames.addAll(cookieNames);
-        keyNames.addAll(parameterNames);
-        keyNames.addAll(Arrays.asList(DEFAULT_KEY_NAMES));
+        List<String> keyList = new ArrayList<>();
+        keyList.addAll(headerNames);
+        keyList.addAll(cookieNames);
+        keyList.addAll(parameterNames);
+        keyList.addAll(Arrays.asList(DEFAULT_KEY_NAMES));
 
         this.keyNames.clear();
-        this.keyNames.addAll(keyNames);
+        this.keyNames.addAll(keyList);
     }
 
     @Deactivate
@@ -218,16 +218,5 @@ public class MDCInsertingFilter implements Filter {
         if(key != null && value != null){
             MDC.put(key,value);
         }
-    }
-
-    private static Set<String> toTrimmedValues(Map<String,Object> config,String propName){
-        String[] values = PropertiesUtil.toStringArray(config.get(propName),EMPTY_VALUE);
-        Set<String> result = new HashSet<String>(values.length);
-        for(String value : values){
-            if(value != null && value.trim().length() > 0){
-                result.add(value.trim());
-            }
-        }
-        return result;
     }
 }

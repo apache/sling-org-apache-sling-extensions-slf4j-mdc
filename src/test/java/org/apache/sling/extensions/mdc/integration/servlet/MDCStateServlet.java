@@ -26,7 +26,6 @@ import org.osgi.util.tracker.ServiceTracker;
 import org.slf4j.MDC;
 
 import javax.json.Json;
-import javax.json.JsonObject;
 import javax.json.stream.JsonGenerator;
 import javax.servlet.Servlet;
 import javax.servlet.ServletException;
@@ -35,20 +34,18 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.util.Dictionary;
 import java.util.Hashtable;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Map.Entry;
 
-public class MDCStateServlet extends HttpServlet implements BundleActivator{
+public class MDCStateServlet extends HttpServlet implements BundleActivator {
     private ServiceTracker configAdminTracker;
 
     public void start(BundleContext context) throws Exception {
-        Properties p  = new Properties();
-        p.setProperty("alias","/mdc");
-        context.registerService(Servlet.class.getName(),this,p);
+        Dictionary<String, Object> properties = new Hashtable<>();
+        properties.put("alias","/mdc");
+        context.registerService(Servlet.class.getName(),this, properties);
         configAdminTracker = new ServiceTracker(context, ConfigurationAdmin.class.getName(),null);
         configAdminTracker.open();
     }
@@ -84,7 +81,7 @@ public class MDCStateServlet extends HttpServlet implements BundleActivator{
         ConfigurationAdmin ca = (ConfigurationAdmin) configAdminTracker.getService();
         Configuration cfg = ca.getConfiguration("org.apache.sling.extensions.mdc.internal.MDCInsertingFilter",null);
 
-        Dictionary<String,Object> dict = new Hashtable<String, Object>();
+        Dictionary<String,Object> dict = new Hashtable<>();
         dict.put("headers",new String[]{"mdc-test-header"});
         dict.put("parameters",new String[]{"mdc-test-param"});
         dict.put("cookies",new String[]{"mdc-test-cookie"});
