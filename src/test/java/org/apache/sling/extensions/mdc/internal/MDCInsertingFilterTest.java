@@ -45,7 +45,7 @@ public class MDCInsertingFilterTest {
         properties.put("parameters", new String[]{"mdc-test-param"});
         properties.put("cookies", new String[]{"mdc-test-cookie"});
 
-        mdcInsertingFilter = context.registerInjectActivateService(new MDCInsertingFilter(), properties);
+        mdcInsertingFilter = context.registerInjectActivateService(MDCInsertingFilter.class, new MDCInsertingFilter(), properties);
     }
 
     @Test
